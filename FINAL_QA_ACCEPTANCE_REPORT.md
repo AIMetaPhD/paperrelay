@@ -5,6 +5,7 @@
 - 基线：PM 审查 commit `4ae76d5`；R2 修复 commit `06544ac`；分支 `fix/acceptance-r1`
 - 验收方式：只读复核已保存的真实证据（`QA_PRODUCT_REPORT_R2.md`、`docs/qa-r2/evidence/`、相关测试源码与测试输出日志），未重新执行测试、未修改任何产品代码。
 - 证据根目录：`docs/qa-r2/evidence/`；开发者交叉证据：`docs/qa-r2/developer/` 与 `docs/qa-r2/facts_*.json`。
+- 脱敏说明：为避免公开本机路径、用户环境信息和论文样本，证据目录不随公开仓库发布；报告中的证据路径对应仓库外的私有归档。
 
 > 说明：独立 QA 代理因上下文上限中断，报告据真实证据续接。本报告不声称执行了未实际运行的测试，结论以已保存的执行日志、ffprobe 输出、测试结果和截图文件为准。
 
