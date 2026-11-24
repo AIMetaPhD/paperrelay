@@ -4,7 +4,7 @@
 
 **English:** PaperRelay is a local-first research communication workspace. Upload a paper PDF and produce bilingual promotional copy, a narrated MP4 with subtitles, a deployable project page, and a status matrix — all on your machine.
 
-> Version: `0.1.0`
+> Version: `0.1.1`
 
 > 这是可运行的本地 Web App，不是静态演示。所有记录保存在 `data/`，服务只绑定 `127.0.0.1`。
 
@@ -78,15 +78,22 @@ Windows 也可以直接运行：
 
 如果 Playwright Chromium、Edge TTS 或 FFmpeg 缺失，任务会显示具体错误与安装提示，不会生成空 MP4。
 
+## 环境自检、CI 与发布
+
+- 设置页“环境自检”会检查 Python、FFmpeg/FFprobe、Playwright Chromium 与 Edge TTS 网络。
+- `.github/workflows/ci.yml` 在 push/PR 时运行 20 项回归测试。
+- `.github/workflows/pages.yml` 是 `workflow_dispatch` 手动 Pages 部署模板，需要 `docs/site/index.html` 与 Environment 批准。
+- `CONTRIBUTING.md`、Issue 模板和 PR 模板提供协作入口。
+
 ## 已实现
 
 | 模块 | 行为 |
 |---|---|
-| 论文导入 | 拖入 PDF，PyMuPDF 解析文本/图/链接；自动核对 Semantic Scholar、arXiv、OpenAlex 的 title/authors/abstract/venue；**OpenReview 不做自动查询**，仅在用户填写 venue 来源时记录其 URL |
+| 论文导入 | 拖入 PDF，PyMuPDF 解析文本/图/链接；可选 pypdf 宽松许可引擎（仅文本/链接）；自动核对 Semantic Scholar、arXiv、OpenAlex 的 title/authors/abstract/venue；OpenReview URL 可查询候选，但不会自动确认 venue |
 | 事实 | 自动抽取带页码与原句的**候选数值事实**（状态 `candidate`，过滤无比较语境的模型大小），可在论文卡逐条标记 `verified`；venue 必须有来源才算确认；代码链接自动抽取后需用户确认归属；文案生成后做数字/venue/代码链接对照，问题进入 `needs_review` |
 | 文案 | X 英文/中文、LinkedIn、公众号、小红书；可编辑、保存、重新生成、候选稿并排对比与采用、标记可发布 |
-| 视频 | 真实 MP4 + 旁白 + 字幕 + SRT；可重新生成 |
-| 项目主页 | 响应式 `index.html` + assets + BibTeX + 视频；本地预览与 ZIP 导出 |
+| 视频 | 真实 MP4 + 英文/中文旁白 + 字幕 + SRT；可重新生成 |
+| 项目主页 | 响应式 `index.html` + assets + BibTeX + 视频；本地预览、分享长图与 ZIP 导出 |
 | 传播矩阵 | 每个物料的 absent/generating/draft/needs_review/ready/stale/failed 状态；来源登记与立即检查 |
 | 维护 | 定时检查 arXiv / GitHub / 本地文件 / URL；变化后把已生成物料标为 stale，并自动准备文案与主页的更新候选（人工稿保留，候选进入待审核） |
 | 发布 | GitHub Pages 适配器；必须显式勾选批准；服务端校验版本、物料状态与事实问题；推送后轮询 Pages 构建并实际请求 URL，只有页面真实可访问才标记 `live`，否则记为 `pending_verification` |
@@ -108,7 +115,8 @@ frontend/ (vanilla SPA)
    │  fetch /api
 backend/main.py (FastAPI, 127.0.0.1)
    ├── extract.py      PDF → text / figures / claims
-   ├── metadata.py     Semantic Scholar / arXiv / OpenAlex（不含 OpenReview 自动查询）
+   ├── metadata.py     Semantic Scholar / arXiv / OpenAlex；OpenReview 候选查询
+   ├── preflight.py    Python / FFmpeg / Chromium / TTS 环境自检
    ├── generate.py     LLM copy + deterministic fact check
    ├── video.py        Playwright slides + Edge TTS + ffmpeg
    ├── site.py         responsive project page + BibTeX

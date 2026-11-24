@@ -20,14 +20,15 @@ from .facts import code_confirmed, venue_confirmed
 from .generate import check_model, content_hash, fact_check, generate_copy
 from .github_publish import github_status, publish_site
 from .maintenance import check_project_sources, set_regenerate_hook, start_scheduler
-from .metadata import enrich_metadata
+from .metadata import enrich_metadata, resolve_external
+from .preflight import run_checks
 from .site import generate_site
 from .video import generate_video
 
 FRONTEND = APP_ROOT / "frontend"
 ensure_dirs()
 db.init_db()
-app = FastAPI(title="PaperRelay", version="0.1.0")
+app = FastAPI(title="PaperRelay", version="0.1.1")
 executor = ThreadPoolExecutor(max_workers=2)
 
 app.mount("/static", StaticFiles(directory=str(FRONTEND)), name="static")
@@ -95,7 +96,8 @@ def _run_parse(job_id: str, project_id: str, payload: dict[str, Any]) -> dict[st
     project_dir = _project_dir(project_id)
     progress = _job_progress(job_id)
     progress(0.1, "Reading PDF")
-    data = extract_pdf(Path(version["pdf_path"]), project_dir)
+    engine = db.get_setting("pdf_engine", "pymupdf") or "pymupdf"
+    data = extract_pdf(Path(version["pdf_path"]), project_dir, engine=engine)
     progress(0.55, "Checking metadata")
     meta = enrich_metadata(data["title"], data["links"].get("arxiv_id", ""), data["links"].get("doi", ""))
     title = meta.get("title") or data["title"]
@@ -345,7 +347,17 @@ def index() -> FileResponse:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "app": "PaperRelay", "version": "0.1.0"}
+    return {"ok": True, "app": "PaperRelay", "version": "0.1.1"}
+
+
+@app.get("/api/health/dependencies")
+def dependency_health() -> dict[str, Any]:
+    checks = run_checks()
+    return {
+        "ok": all(item["status"] != "fail" for item in checks),
+        "checks": checks,
+        "checked_at": db.now(),
+    }
 
 
 @app.post("/api/projects")
@@ -447,6 +459,13 @@ def update_metadata(project_id: str, body: dict[str, Any] = Body(...)) -> dict[s
                 )
     db.add_event(project_id, "metadata_edited", {"fields": list(fields)})
     return db.get_project(project_id) or {}
+
+
+@app.post("/api/projects/{project_id}/metadata/resolve")
+def resolve_metadata(project_id: str, body: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    if not db.get_project(project_id):
+        raise HTTPException(404, "Project not found")
+    return resolve_external(str(body.get("arxiv_id", "")), str(body.get("openreview_url", "")))
 
 
 @app.post("/api/projects/{project_id}/reparse")
@@ -573,6 +592,28 @@ def artifact_candidate(project_id: str, artifact_id: str) -> dict[str, Any]:
     }
 
 
+@app.post("/api/projects/{project_id}/site/longimage")
+def site_longimage(project_id: str) -> dict[str, Any]:
+    """Render the generated project page to a shareable long PNG."""
+    site = db.get_artifact(project_id, "site")
+    if not site or not site.get("content") or not Path(site["content"]).exists():
+        raise HTTPException(400, "Generate the project page first.")
+    from playwright.sync_api import sync_playwright
+
+    output = _project_dir(project_id) / "share_long.png"
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1080, "height": 1600}, device_scale_factor=1)
+            page.goto(Path(site["content"]).resolve().as_uri(), wait_until="networkidle")
+            page.screenshot(path=str(output), full_page=True)
+            browser.close()
+    except Exception as exc:
+        raise HTTPException(500, f"Long image failed: {str(exc)[:300]}")
+    db.add_event(project_id, "longimage_created", {"path": str(output)})
+    return {"ok": True, "url": f"/files/{project_id}/{output.name}", "path": str(output)}
+
+
 @app.post("/api/projects/{project_id}/artifacts/{artifact_id}/approve")
 def approve_artifact(project_id: str, artifact_id: str) -> dict[str, Any]:
     """Server-side gate: stale, outdated or factually wrong artifacts cannot be approved."""
@@ -638,7 +679,7 @@ def settings() -> dict[str, Any]:
 @app.put("/api/settings")
 def update_settings(body: dict[str, Any] = Body(...)) -> dict[str, Any]:
     allowed = {"llm_base_url", "llm_model", "llm_api_key", "llm_wire_api", "voice_en", "voice_zh",
-               "video_language", "github_repo", "maintenance_enabled", "maintenance_interval_min"}
+               "video_language", "pdf_engine", "github_repo", "maintenance_enabled", "maintenance_interval_min"}
     for key, value in body.items():
         if key in allowed and not (key == "llm_api_key" and "•" in str(value)):
             db.set_setting(key, str(value))

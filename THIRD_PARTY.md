@@ -11,7 +11,8 @@ Verified against the installed packages on 2026-11-20 (`importlib.metadata`).
 | Component | Installed | License | Use |
 |---|---|---|---|
 | FastAPI / Uvicorn | 0.164.0 | MIT | local HTTP API |
-| PyMuPDF | 2.1 | **AGPL-3.0 or Artifex commercial** | PDF text/figure extraction |
+| PyMuPDF | 2.1 | **AGPL-3.0 or Artifex commercial** | PDF text/figure extraction (default) |
+| pypdf | 6.x | BSD-3-Clause | optional text/link-only PDF plugin |
 | Pillow | 13.0.0 | HPND (MIT-CMU) | subtitle images |
 | edge-tts | 7.3.1 | **LGPL-3.0** | narration synthesis (optional) |
 | Playwright | 1.65.2 | Apache-2.0 | slide screenshots |

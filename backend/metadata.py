@@ -216,3 +216,84 @@ def enrich_metadata(title: str, arxiv_id: str = "", doi: str = "") -> dict[str, 
 
     result["authors"] = [a for a in result["authors"] if a]
     return result
+
+
+def openreview_id(value: str) -> str:
+    value = (value or "").strip()
+    match = re.search(r"[?&]id=([^&#]+)", value)
+    if match:
+        return match.group(1)
+    return value if re.fullmatch(r"[A-Za-z0-9_-]{6,}", value) else ""
+
+
+def _openreview_note(note_id: str) -> dict[str, Any]:
+    if not note_id:
+        return {}
+    for base in ("https://api2.openreview.net", "https://api.openreview.net"):
+        response = _get(f"{base}/notes", {"forum": note_id, "limit": 1})
+        if not response:
+            continue
+        try:
+            notes = response.json().get("notes") or []
+            if not notes:
+                continue
+            content = notes[0].get("content") or {}
+
+            def value(key: str) -> str:
+                item = content.get(key)
+                if isinstance(item, dict):
+                    item = item.get("value")
+                if isinstance(item, list):
+                    return ", ".join(str(v) for v in item if v)
+                return str(item or "")
+
+            title = value("title")
+            venue = value("venue") or value("venueid")
+            authors = value("authors")
+            if title or venue or authors:
+                return {
+                    "title": title,
+                    "venue": venue,
+                    "authors": [a.strip() for a in authors.split(",") if a.strip()],
+                    "source": f"OpenReview ({note_id})",
+                    "url": f"https://openreview.net/forum?id={note_id}",
+                }
+        except Exception:
+            continue
+    return {}
+
+
+def resolve_external(arxiv_id: str = "", openreview_url: str = "") -> dict[str, Any]:
+    """Return candidate metadata only; never write it into the paper record."""
+    result: dict[str, Any] = {"candidates": {}, "sources": [], "warnings": []}
+    arxiv_id = (arxiv_id or "").strip()
+    if arxiv_id:
+        arxiv = _arxiv_entry(arxiv_id)
+        if arxiv:
+            result["candidates"].update({
+                "title": arxiv.get("title", ""),
+                "authors": arxiv.get("authors", []),
+                "abstract": arxiv.get("abstract", ""),
+                "year": (arxiv.get("published") or "")[:4],
+                "arxiv_id": arxiv_id,
+                "paper_url": f"https://arxiv.org/abs/{arxiv_id}",
+            })
+            result["sources"].append("arXiv API")
+        else:
+            result["warnings"].append(f"arXiv {arxiv_id} did not return an entry.")
+    note_id = openreview_id(openreview_url)
+    if openreview_url:
+        note = _openreview_note(note_id)
+        if note:
+            result["candidates"].update({
+                "title": note["title"],
+                "authors": note["authors"],
+                "venue": note["venue"],
+                "venue_source": note["url"],
+                "paper_url": note["url"],
+            })
+            result["sources"].append(note["source"])
+        else:
+            result["warnings"].append("OpenReview note could not be resolved; enter the venue source manually.")
+    result["note"] = "Candidates are not applied automatically. Review them and save the paper card to confirm."
+    return result

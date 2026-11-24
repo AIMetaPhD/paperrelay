@@ -23,6 +23,7 @@ DEFAULT_SETTINGS = {
     "voice_en": "en-US-AriaNeural",
     "voice_zh": "zh-CN-XiaoxiaoNeural",
     "video_language": "en",
+    "pdf_engine": "pymupdf",
     "github_repo": "",
     "maintenance_enabled": "0",
     "maintenance_interval_min": "30",

@@ -6,7 +6,8 @@ their own licenses; the MIT license does not relicense them.
 | Component | Tested version | License | How it is used |
 |---|---|---|---|
 | FastAPI / Uvicorn | 0.164.0 | MIT | local HTTP API |
-| PyMuPDF (`pymupdf`) | 2.1 | **AGPL-3.0 or Artifex commercial** | PDF text/figure extraction |
+| PyMuPDF (`pymupdf`) | 2.1 | **AGPL-3.0 or Artifex commercial** | PDF text/figure extraction (default) |
+| pypdf | 6.x | BSD-3-Clause | optional text/link-only PDF extraction plugin |
 | Pillow | 13.0.0 | HPND / MIT-CMU | subtitle images |
 | edge-tts | 7.3.1 | **LGPL-3.0** | optional narration synthesis |
 | Playwright | 1.65.2 | Apache-2.0 | slide screenshots (Chromium installed separately) |

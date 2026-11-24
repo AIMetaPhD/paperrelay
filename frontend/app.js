@@ -11,6 +11,14 @@ const S = {
 const $ = (sel) => document.querySelector(sel);
 const main = $("#main");
 
+const LLM_PRESETS = {
+  ollama: { base: "http://127.0.0.1:11434/v1", model: "qwen2.5:7b-instruct", wire: "chat", key: "local" },
+  magpie: { base: "http://127.0.0.1:3425/v1", model: "group/claude-desktop-priority", wire: "responses", key: "magpie" },
+  openai: { base: "https://api.openai.com/v1", model: "gpt-5.5", wire: "chat", key: "" },
+  vllm: { base: "http://127.0.0.1:8000/v1", model: "your-model", wire: "chat", key: "local" },
+  deepseek: { base: "https://api.deepseek.com/v1", model: "deepseek-chat", wire: "chat", key: "" },
+};
+
 const PLATFORM = {
   x_en: { label: "X / Twitter · English", hint: "3–5 条 thread，首帖独立可读" },
   x_zh: { label: "X / Twitter · 中文", hint: "中文短帖" },
@@ -287,6 +295,12 @@ function renderOverviewTab() {
       <label class="field"><span>作者（逗号分隔）</span><input id="meta-authors" type="text" value="${esc((v.authors || []).join(", "))}"></label>
       <label class="field"><span>摘要</span><textarea id="meta-abstract" style="width:100%;min-height:150px;resize:vertical;border:1px solid var(--line);border-radius:8px;padding:10px 11px;background:#fff">${esc(v.abstract || "")}</textarea></label>
       <div class="row">
+        <label class="field"><span>arXiv ID</span><input id="meta-arxiv" type="text" value="${esc(v.arxiv_id || "")}" placeholder="1706.03762"></label>
+        <label class="field"><span>OpenReview URL</span><input id="meta-openreview" type="text" value="${v.venue_source && v.venue_source.startsWith("http") ? esc(v.venue_source) : ""}" placeholder="https://openreview.net/forum?id=..."></label>
+        <button class="btn ghost small" id="meta-resolve" style="max-width:150px;margin-bottom:14px">获取候选</button>
+      </div>
+      <div id="meta-resolve-result" class="small muted"></div>
+      <div class="row">
         <label class="field"><span>Venue${v.venue && v.venue_source ? "" : "（未确认）"}</span><input id="meta-venue" type="text" value="${esc(v.venue || "")}" placeholder="留空表示未确认；填写时请同时填写来源"></label>
         <label class="field"><span>Venue 来源（填写后才算确认）</span><input id="meta-venue-source" type="text" value="${esc(v.venue_source || "")}" placeholder="OpenReview URL / arXiv Comments / 用户确认"></label>
       </div>
@@ -354,6 +368,31 @@ function bindOverview() {
       } catch (err) { toast(err.message, true); }
     };
   }
+  const resolveBtn = $("#meta-resolve");
+  if (resolveBtn) resolveBtn.onclick = async () => {
+    const box = $("#meta-resolve-result");
+    box.textContent = "正在查询候选元数据…";
+    try {
+      const result = await api(`/api/projects/${S.project.id}/metadata/resolve`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          arxiv_id: $("#meta-arxiv").value.trim(),
+          openreview_url: $("#meta-openreview").value.trim(),
+        }),
+      });
+      const c = result.candidates || {};
+      if (c.title) $("#meta-title").value = c.title;
+      if (c.authors?.length) $("#meta-authors").value = c.authors.join(", ");
+      if (c.abstract) $("#meta-abstract").value = c.abstract;
+      if (c.venue) $("#meta-venue").value = c.venue;
+      if (c.venue_source) $("#meta-venue-source").value = c.venue_source;
+      if (c.paper_url) $("#meta-paper").value = c.paper_url;
+      if (c.arxiv_id) $("#meta-arxiv").value = c.arxiv_id;
+      const sources = (result.sources || []).join(", ") || "无";
+      const warnings = (result.warnings || []).join("；");
+      box.innerHTML = `<span style="color:var(--teal)">候选来源：${esc(sources)}。已填入表单，确认后点“保存修改”。</span>${warnings ? ` <span style="color:var(--red)">${esc(warnings)}</span>` : ""}`;
+    } catch (err) { box.textContent = err.message; }
+  };
   const btn = $("#meta-save");
   if (!btn) return;
   btn.onclick = async () => {
@@ -396,6 +435,7 @@ function renderCopyTab() {
       ${issues.length ? `<div class="issues">${issues.map((i) => `<div>${esc(i.message || i.type)}</div>`).join("")}</div>` : ""}
       <div class="artifact-actions">
         <button class="btn small" data-save="${a.id}">保存修改</button>
+        <button class="btn ghost small" data-md="${a.id}">复制 Markdown</button>
         <button class="btn ghost small" data-regen="${a.id}">重新生成</button>
         <button class="btn ghost small" data-approve="${a.id}" ${["draft","needs_review","stale"].includes(a.status) ? "" : "disabled"}>标记可发布</button>
         <button class="btn ghost small" data-candidate="${a.id}">候选稿对比</button>
@@ -419,6 +459,21 @@ function bindCopy() {
         method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content })
       }); toast("已保存"); await loadProject(S.project.id, { silent: true }); renderProject(); }
       catch (err) { toast(err.message, true); }
+    };
+  });
+  document.querySelectorAll("[data-md]").forEach((btn) => {
+    btn.onclick = async () => {
+      const id = btn.dataset.md;
+      const content = document.querySelector(`[data-content="${id}"]`).value;
+      const markdown = `## ${PLATFORM[S.project.artifacts.find((a) => a.id === id)?.platform]?.label || "Paper copy"}\n\n${content}`;
+      try {
+        await navigator.clipboard.writeText(markdown);
+        toast("Markdown 已复制到剪贴板");
+      } catch {
+        const area = document.createElement("textarea");
+        area.value = markdown; document.body.appendChild(area); area.select();
+        document.execCommand("copy"); area.remove(); toast("Markdown 已复制");
+      }
     };
   });
   document.querySelectorAll("[data-regen]").forEach((btn) => {
@@ -563,6 +618,7 @@ function renderPageTab() {
       <a class="btn small" href="${siteUrl}" target="_blank">打开页面</a>
       <a class="btn ghost small" href="/api/projects/${p.id}/export">导出 ZIP</a>
       <button class="btn ghost small" data-site-regen>重新生成主页</button>
+      <button class="btn ghost small" id="site-longimage">生成分享长图</button>
     </div>
   </section>
   <section class="card card-pad mt-lg">
@@ -580,6 +636,16 @@ function renderPageTab() {
 }
 
 function bindPage() {
+  const longimage = document.querySelector("#site-longimage");
+  if (longimage) longimage.onclick = async () => {
+    longimage.disabled = true;
+    try {
+      const result = await api(`/api/projects/${S.project.id}/site/longimage`, { method: "POST" });
+      window.open(result.url, "_blank");
+      toast("分享长图已生成");
+    } catch (err) { toast(err.message, true); }
+    longimage.disabled = false;
+  };
   const regen = document.querySelector("[data-site-regen]");
   if (regen) regen.onclick = async () => {
     const art = S.project.artifacts.find((a) => a.kind === "site");
@@ -666,6 +732,24 @@ function bindMatrix() {
 }
 
 /* ---------- Settings ---------- */
+async function runPreflight() {
+  const box = $("#preflight-result");
+  if (!box) return;
+  box.innerHTML = `<div class="small muted">检测中…</div>`;
+  try {
+    const result = await api("/api/health/dependencies");
+    const cls = { ok: "ready", warn: "needs_review", fail: "failed" };
+    box.innerHTML = `<div class="stack" style="gap:8px">${(result.checks || []).map((check) => `
+      <div class="event" style="align-items:center">
+        <span class="pill ${cls[check.status] || "failed"}">${esc(check.status.toUpperCase())}</span>
+        <strong style="min-width:90px">${esc(check.key)}</strong>
+        <span class="small muted" style="flex:1">${esc(check.detail || "")}${check.hint ? ` · ${esc(check.hint)}` : ""}</span>
+      </div>`).join("")}</div>`;
+  } catch (err) {
+    box.innerHTML = `<div class="small" style="color:var(--red)">${esc(err.message)}</div>`;
+  }
+}
+
 async function renderSettings() {
   try { S.settings = await api("/api/settings"); } catch (err) { renderError(err); return; }
   const s = S.settings;
@@ -674,6 +758,14 @@ async function renderSettings() {
     <div class="grid two">
       <section class="card card-pad">
         <div class="eyebrow">LLM</div><h2 style="margin-top:8px">模型连接</h2>
+        <label class="field"><span>快速预设</span><select id="set-preset">
+          <option value="">选择预设…</option>
+          <option value="ollama">Ollama（本地 chat）</option>
+          <option value="magpie">Magpie（本地 responses）</option>
+          <option value="openai">OpenAI（chat）</option>
+          <option value="vllm">vLLM（本地 chat）</option>
+          <option value="deepseek">DeepSeek（chat）</option>
+        </select></label>
         <label class="field"><span>OpenAI 兼容 Base URL</span><input id="set-base" type="text" value="${esc(s.llm_base_url || "")}" placeholder="http://127.0.0.1:11434/v1 或 http://127.0.0.1:3425/v1"></label>
         <label class="field"><span>API 协议</span><select id="set-wire">
           <option value="chat" ${(s.llm_wire_api || "chat") === "chat" ? "selected" : ""}>/chat/completions（Ollama、OpenAI、vLLM）</option>
@@ -692,6 +784,10 @@ async function renderSettings() {
         </select></label>
         <label class="field"><span>英文旁白音色</span><input id="set-voice-en" type="text" value="${esc(s.voice_en || "")}"></label>
         <label class="field"><span>中文旁白音色</span><input id="set-voice-zh" type="text" value="${esc(s.voice_zh || "")}"></label>
+        <label class="field"><span>PDF 解析引擎</span><select id="set-pdf-engine">
+          <option value="pymupdf" ${(s.pdf_engine || "pymupdf") === "pymupdf" ? "selected" : ""}>PyMuPDF（含图裁切，默认）</option>
+          <option value="pypdf" ${s.pdf_engine === "pypdf" ? "selected" : ""}>pypdf（宽松许可，仅文本/链接）</option>
+        </select></label>
         <p class="small muted">默认使用 Edge TTS（需要网络）。视频渲染使用本机 ffmpeg；未安装时会在任务里给出明确错误。</p>
       </section>
     </div>
@@ -704,23 +800,42 @@ async function renderSettings() {
       <p class="small muted">每个项目在“传播矩阵”里登记具体来源。定时器只在本地服务运行时工作；重启后配置保留。</p>
     </section>
     <section class="card card-pad mt-lg">
+      <div class="eyebrow">Pre-flight</div><h2 style="margin-top:8px">环境自检</h2>
+      <div class="row">
+        <p class="small muted" style="flex:2;margin:0">检查 Python、FFmpeg/FFprobe、Playwright Chromium 与 Edge TTS 网络。生成前可先看这里。</p>
+        <button class="btn small" id="preflight-run" style="flex:0 0 auto;max-width:140px">重新检测</button>
+      </div>
+      <div id="preflight-result" class="mt"></div>
+    </section>
+    <section class="card card-pad mt-lg">
       <div class="eyebrow">GitHub</div><h2 style="margin-top:8px">连接状态</h2>
       <p class="small">${s.github?.ok ? `已登录：<strong>${esc(s.github.account || "已授权")}</strong>` : `未连接：${esc(s.github?.error || "gh 未登录")}`}</p>
       <label class="field"><span>默认目标仓库</span><input id="set-repo" type="text" value="${esc(s.github_repo || "")}" placeholder="owner/name"></label>
       <button class="btn small" id="save-github">保存仓库</button>
     </section>`;
 
+  $("#set-preset").onchange = () => {
+    const preset = LLM_PRESETS[$("#set-preset").value];
+    if (!preset) return;
+    $("#set-base").value = preset.base;
+    $("#set-model").value = preset.model;
+    $("#set-wire").value = preset.wire;
+    if (preset.key) $("#set-key").value = preset.key;
+  };
   $("#save-settings").onclick = async () => {
     try {
       await api("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
         llm_base_url: $("#set-base").value.trim(), llm_wire_api: $("#set-wire").value,
         llm_model: $("#set-model").value.trim(),
         llm_api_key: $("#set-key").value.trim(), video_language: $("#set-video-language").value,
-        voice_en: $("#set-voice-en").value.trim(), voice_zh: $("#set-voice-zh").value.trim()
+        voice_en: $("#set-voice-en").value.trim(), voice_zh: $("#set-voice-zh").value.trim(),
+        pdf_engine: $("#set-pdf-engine").value
       }) });
       toast("设置已保存"); renderSettings();
     } catch (err) { toast(err.message, true); }
   };
+  $("#preflight-run").onclick = runPreflight;
+  runPreflight();
   $("#test-model").onclick = async () => {
     $("#model-result").textContent = "测试中…";
     try {

@@ -88,3 +88,14 @@ python -m venv .venv
 - 发布包：`PaperRelay-v0.1.0-source.zip`，已作为 Release asset 发布，不含论文样本或私有数据。
 - 合规：自有代码 MIT；PyMuPDF AGPL/商业、edge-tts LGPL-3.0 说明见 `THIRD_PARTY_LICENSES.md`。论文 PDF/视频帧等再分发受限证据保存在私有归档，不进入公开仓库。
 - 未完成：真实 GitHub Pages 部署和社交平台发布未执行，仍需单独人工授权。
+
+## R4 后续演进交付（v0.1.1，2026-11-25）
+
+- 环境自检：`GET /api/health/dependencies` + 设置页检查 Python / FFmpeg / Chromium / Edge TTS。
+- 候选元数据：arXiv ID 与 OpenReview URL 查询只填入表单，不自动确认 venue。
+- 文案复制 Markdown；项目主页生成 `share_long.png` 分享长图。
+- 可选 PDF 引擎 `pypdf`（仅文本/链接，不含图裁切），默认仍为 PyMuPDF。
+- 模型快速预设：Ollama / Magpie / OpenAI-compatible / vLLM / DeepSeek。
+- GitHub Actions：`ci.yml` 跑 20 项回归测试；`pages.yml` 为带 Environment 审批的手动 Pages 部署。
+- 社区：`CONTRIBUTING.md`、Issue 模板、PR 模板。
+- 验证：`test_verify.py` 20 tests，0 failures；浏览器实测环境自检、Markdown 按钮、长图按钮均正常。

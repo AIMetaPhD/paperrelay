@@ -10,7 +10,7 @@ import fitz  # PyMuPDF
 from .facts import claim_is_meaningful
 
 NOISE = re.compile(
-    r"arxiv|preprint|under review|published as|copyright|proceedings|conference on|"
+    r"arxiv|preprint|under review|published as|proceedings|conference on|"
     r"doi:|https?://|all rights reserved|draft|version",
     re.I,
 )
@@ -356,7 +356,44 @@ def _figures_from_pdf(doc: fitz.Document, outdir: Path) -> list[dict[str, Any]]:
     return figures
 
 
-def extract_pdf(pdf_path: Path, project_dir: Path) -> dict[str, Any]:
+def available_pdf_engines() -> list[str]:
+    engines = ["pymupdf"]
+    try:
+        import pypdf  # noqa: F401
+        engines.append("pypdf")
+    except Exception:
+        pass
+    return engines
+
+
+def _extract_with_pypdf(pdf_path: Path) -> dict[str, Any]:
+    try:
+        from pypdf import PdfReader
+    except Exception as exc:
+        raise RuntimeError("pypdf is not installed; run pip install pypdf") from exc
+    reader = PdfReader(str(pdf_path))
+    pages = [_clean(page.extract_text() or "") for page in reader.pages]
+    full_text = "\n\n".join(pages)
+    lines = [line.strip() for line in full_text.splitlines() if line.strip()]
+    title = _clean(lines[0])[:300] if lines else ""
+    links = _links_from_text(full_text)
+    return {
+        "title": title,
+        "authors": [],
+        "abstract": _abstract_from_text(full_text),
+        "text": full_text,
+        "pages": len(pages),
+        "figures": [],
+        "claims": _claims_from_pages(pages),
+        "links": links,
+        "engine": "pypdf",
+        "warning": "pypdf 仅提供文本/链接，不提供图裁切；需要图时请使用 PyMuPDF。",
+    }
+
+
+def extract_pdf(pdf_path: Path, project_dir: Path, engine: str = "pymupdf") -> dict[str, Any]:
+    if (engine or "pymupdf").lower() == "pypdf":
+        return _extract_with_pypdf(pdf_path)
     doc = fitz.open(str(pdf_path))
     pages = [_clean(page.get_text("text")) for page in doc]
     full_text = "\n\n".join(pages)
