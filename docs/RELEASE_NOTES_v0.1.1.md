@@ -7,8 +7,10 @@ open-source maintenance.
 
 - **Pre-flight self-check** in Settings: Python, FFmpeg/FFprobe, Playwright
   Chromium and Edge TTS network status.
-- **Candidate metadata resolver** for arXiv IDs and OpenReview URLs. Candidates
-  are filled into the paper card but never confirmed or saved automatically.
+- **Candidate metadata resolver** for arXiv IDs and OpenReview URLs. It returns
+  title/authors/abstract plus any OpenReview decision, rating and BibTeX found
+  in the note; candidates are filled into the paper card but never confirmed or
+  saved automatically.
 - **Markdown copy** per platform and **share long image** exported from the
   generated project page.
 - **PDF engine plugin**: optional `pypdf` text/link extraction alongside the

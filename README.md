@@ -89,7 +89,7 @@ Windows 也可以直接运行：
 
 | 模块 | 行为 |
 |---|---|
-| 论文导入 | 拖入 PDF，PyMuPDF 解析文本/图/链接；可选 pypdf 宽松许可引擎（仅文本/链接）；自动核对 Semantic Scholar、arXiv、OpenAlex 的 title/authors/abstract/venue；OpenReview URL 可查询候选，但不会自动确认 venue |
+| 论文导入 | 拖入 PDF，PyMuPDF 解析文本/图/链接；可选 pypdf 宽松许可引擎（仅文本/链接）；自动核对 Semantic Scholar、arXiv、OpenAlex 的 title/authors/abstract/venue；OpenReview URL 可查询候选及 decision/rating/BibTeX，但不会自动确认 venue |
 | 事实 | 自动抽取带页码与原句的**候选数值事实**（状态 `candidate`，过滤无比较语境的模型大小），可在论文卡逐条标记 `verified`；venue 必须有来源才算确认；代码链接自动抽取后需用户确认归属；文案生成后做数字/venue/代码链接对照，问题进入 `needs_review` |
 | 文案 | X 英文/中文、LinkedIn、公众号、小红书；可编辑、保存、重新生成、候选稿并排对比与采用、标记可发布 |
 | 视频 | 真实 MP4 + 英文/中文旁白 + 字幕 + SRT；可重新生成 |

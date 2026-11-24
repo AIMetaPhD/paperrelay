@@ -255,6 +255,9 @@ def _openreview_note(note_id: str) -> dict[str, Any]:
                     "title": title,
                     "venue": venue,
                     "authors": [a.strip() for a in authors.split(",") if a.strip()],
+                    "decision": value("decision") or value("recommendation"),
+                    "rating": value("rating"),
+                    "bibtex": value("_bibtex"),
                     "source": f"OpenReview ({note_id})",
                     "url": f"https://openreview.net/forum?id={note_id}",
                 }
@@ -265,7 +268,7 @@ def _openreview_note(note_id: str) -> dict[str, Any]:
 
 def resolve_external(arxiv_id: str = "", openreview_url: str = "") -> dict[str, Any]:
     """Return candidate metadata only; never write it into the paper record."""
-    result: dict[str, Any] = {"candidates": {}, "sources": [], "warnings": []}
+    result: dict[str, Any] = {"candidates": {}, "extras": {}, "sources": [], "warnings": []}
     arxiv_id = (arxiv_id or "").strip()
     if arxiv_id:
         arxiv = _arxiv_entry(arxiv_id)
@@ -293,6 +296,11 @@ def resolve_external(arxiv_id: str = "", openreview_url: str = "") -> dict[str, 
                 "paper_url": note["url"],
             })
             result["sources"].append(note["source"])
+            result["extras"] = {
+                "decision": note.get("decision", ""),
+                "rating": note.get("rating", ""),
+                "bibtex": note.get("bibtex", ""),
+            }
         else:
             result["warnings"].append("OpenReview note could not be resolved; enter the venue source manually.")
     result["note"] = "Candidates are not applied automatically. Review them and save the paper card to confirm."

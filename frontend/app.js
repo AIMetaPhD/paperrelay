@@ -390,7 +390,9 @@ function bindOverview() {
       if (c.arxiv_id) $("#meta-arxiv").value = c.arxiv_id;
       const sources = (result.sources || []).join(", ") || "无";
       const warnings = (result.warnings || []).join("；");
-      box.innerHTML = `<span style="color:var(--teal)">候选来源：${esc(sources)}。已填入表单，确认后点“保存修改”。</span>${warnings ? ` <span style="color:var(--red)">${esc(warnings)}</span>` : ""}`;
+      const extras = result.extras || {};
+      const extraText = [extras.decision && `决定：${extras.decision}`, extras.rating && `评分：${extras.rating}`, extras.bibtex && "含 OpenReview BibTeX"].filter(Boolean).join(" · ");
+      box.innerHTML = `<span style="color:var(--teal)">候选来源：${esc(sources)}。已填入表单，确认后点“保存修改”。</span>${extraText ? ` <span class="small">${esc(extraText)}</span>` : ""}${warnings ? ` <span style="color:var(--red)">${esc(warnings)}</span>` : ""}`;
     } catch (err) { box.textContent = err.message; }
   };
   const btn = $("#meta-save");
