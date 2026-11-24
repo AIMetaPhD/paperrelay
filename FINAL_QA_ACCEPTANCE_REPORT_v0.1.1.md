@@ -17,7 +17,7 @@
 | 分享长图 | PASS | `POST /api/projects/{id}/site/longimage` 返回 200，生成 `share_long.png`；浏览器按钮存在 |
 | PDF 引擎插件 | PASS | `available_pdf_engines() = [pymupdf, pypdf]`；pypdf 实测 26 页/文本/claims 可用，无图 |
 | 模型预设 | PASS | Ollama/Magpie/OpenAI-compatible/vLLM/DeepSeek 预设可填充 Base URL、模型和协议 |
-| CI | PASS | `.github/workflows/ci.yml` 运行 20 项测试；未在 GitHub runner 上实际等待结果 |
+| CI | PASS | GitHub Actions run `45459933289` 在 `master` 上成功；`.github/workflows/ci.yml` 跑 20 项测试 |
 | 社区模板 | PASS | CONTRIBUTING、Bug/Paper parsing issue 模板、PR 模板已加入 |
 | Pages workflow | PASS（模板） | `workflow_dispatch` + `github-pages` environment；需要 `docs/site/index.html` 和人工批准，未实际部署 |
 | 中文旁白回归 | PASS | 之前实测 62.176s、1920x1080、h264/aac、中文 SRT；仍由 `tests/test_video_language.py` 覆盖 |
